@@ -19,7 +19,7 @@ USER root
 WORKDIR /home/container
 
 # Wings mounts /mnt/install/install.sh as root-only and invokes the configured
-# egg entrypoint as CMD. Run that one command as root. All normal server paths
-# drop back to the unprivileged container user.
-ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "-c", "if [ \"$#\" -ge 2 ] && [ \"$1\" = bash ] && [ \"$2\" = /mnt/install/install.sh ]; then exec /bin/bash /mnt/install/install.sh; elif [ \"$#\" -gt 0 ]; then exec /usr/sbin/gosu container \"$@\"; else exec /usr/sbin/gosu container /bin/bash /entrypoint.sh; fi", "--"]
+# egg entrypoint as CMD. The normal Wings runtime already overrides the user;
+# only drop privileges when this process still has UID 0.
+ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "-c", "if [ \"$#\" -ge 2 ] && [ \"$1\" = bash ] && [ \"$2\" = /mnt/install/install.sh ]; then exec /bin/bash /mnt/install/install.sh; elif [ \"$#\" -gt 0 ]; then if [ \"$(id -u)\" -eq 0 ]; then exec /usr/sbin/gosu container \"$@\"; else exec \"$@\"; fi; else if [ \"$(id -u)\" -eq 0 ]; then exec /usr/sbin/gosu container /bin/bash /entrypoint.sh; else exec /bin/bash /entrypoint.sh; fi; fi", "--"]
 CMD []
