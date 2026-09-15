@@ -22,9 +22,14 @@ mkdir -p \
     "${ROOT}/database/mysql" "${ROOT}/database/run" "${ROOT}/database/tmp" \
     "${ROOT}/scripts" "${ROOT}/logs" "${ROOT}/.ree6-aio"
 
-BOT_JSON="$(release_json Ree6-Applications/Ree6 "${BOT_VERSION:-4.0.12}")"
-BOT_URL="$(jq -r '.assets[] | select(.name | test("jar-with-dependencies\\.jar$")) | .browser_download_url' <<<"${BOT_JSON}" | head -n1)"
-[[ -n "${BOT_URL}" && "${BOT_URL}" != "null" ]] || { log "Unable to find the REE6 fat JAR."; exit 1; }
+BUNDLED_BOT="/opt/ree6-aio/Ree6.jar"
+BUNDLED_BOT_VERSION="$(cat /opt/ree6-aio/bot-version 2>/dev/null || true)"
+REQUESTED_BOT_VERSION="${BOT_VERSION:-4.0.12}"
+[[ -s "${BUNDLED_BOT}" ]] || { log "The runtime image does not contain the patched REE6 bot."; exit 1; }
+[[ "${REQUESTED_BOT_VERSION}" == "${BUNDLED_BOT_VERSION}" ]] || {
+    log "BOT_VERSION ${REQUESTED_BOT_VERSION} is not bundled in this runtime (expected ${BUNDLED_BOT_VERSION})."
+    exit 1
+}
 
 WEB_JSON="$(release_json Ree6-Applications/Webinterface "${WEB_VERSION:-5.0.4}")"
 BACKEND_URL_ASSET="$(jq -r '.assets[] | select(.name | test("Webinterface-Backend-.*\\.jar$")) | .browser_download_url' <<<"${WEB_JSON}" | head -n1)"
@@ -34,8 +39,8 @@ FRONTEND_TARBALL="$(jq -r '.tarball_url' <<<"${WEB_JSON}")"
 if [[ -f "${ROOT}/runtime/bot/Ree6.jar" ]]; then cp -f "${ROOT}/runtime/bot/Ree6.jar" "${ROOT}/runtime/bot/Ree6.jar.previous"; fi
 if [[ -f "${ROOT}/runtime/backend/Webinterface.jar" ]]; then cp -f "${ROOT}/runtime/backend/Webinterface.jar" "${ROOT}/runtime/backend/Webinterface.jar.previous"; fi
 
-log "Downloading REE6 bot..."
-curl -fL --retry 3 -o "${ROOT}/runtime/bot/Ree6.jar.new" "${BOT_URL}"
+log "Installing patched REE6 bot ${BUNDLED_BOT_VERSION}..."
+cp "${BUNDLED_BOT}" "${ROOT}/runtime/bot/Ree6.jar.new"
 mv -f "${ROOT}/runtime/bot/Ree6.jar.new" "${ROOT}/runtime/bot/Ree6.jar"
 
 log "Downloading webinterface backend..."
