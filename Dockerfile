@@ -1,5 +1,6 @@
 FROM maven:3.9.11-amazoncorretto-21 AS ree6-builder
 
+# The patched bot is compiled once during the runtime-image build.
 ARG REE6_VERSION=4.0.12
 
 RUN yum install -y git \
