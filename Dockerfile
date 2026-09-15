@@ -18,8 +18,8 @@ RUN apt-get update \
 USER container
 WORKDIR /home/container
 
-# Wings passes the installer as CMD; forward it instead of running STARTUP.
-# With no command, use the normal yolk startup script via Bash.
-ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "-c", "if [ \"$#\" -gt 0 ]; then exec \"$@\"; else exec /bin/bash /entrypoint.sh; fi", "--"]
+# Wings mounts its installer without an executable bit. Run shell scripts with
+# Bash, forward other commands normally, and use the yolk startup when no
+# command was supplied.
+ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "-c", "if [ \"$#\" -gt 0 ]; then case \"$1\" in *.sh) exec /bin/bash \"$@\" ;; *) exec \"$@\" ;; esac; else exec /bin/bash /entrypoint.sh; fi", "--"]
 CMD []
-
