@@ -56,6 +56,8 @@ Persistent paths are `database/`, `bot/`, and `backend/`. Reinstall updates runt
 
 This is a multi-process container by design. If any critical service exits, the startup supervisor stops the server so Pterodactyl can detect and restart the crash.
 
+The supervisor starts the REE6 bot first and waits for JDA's `Finished Loading!` marker before it starts the webinterface backend. A further ten-second gap serializes the two Discord `IDENTIFY` operations. This prevents the bot and backend, which use independent JDA sessions for the same Discord application, from entering a mutual reconnect loop during startup.
+
 The backend is deliberately given its config path through the lowercase `config` environment variable. Webinterface 5.0.4 has a command-line parser defect for `--config=...`; using that form can silently select the wrong file and fall back to SQLite.
 
 Webinterface 5.0.4 also returns `Failed to update` when the first ticket configuration is saved without an existing `Tickets` row. The startup supervisor includes a compatibility guard that maintains a disabled zero-value placeholder for known guilds, allowing ticket setups to be created again after removal. Remove this guard when an upstream release fixes `GuildService.updateTicket()`.
