@@ -18,5 +18,6 @@ RUN apt-get update \
 USER container
 WORKDIR /home/container
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
+# The inherited yolk script is readable but may not have its executable bit set.
+ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "/entrypoint.sh"]
 
