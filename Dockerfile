@@ -18,6 +18,8 @@ RUN apt-get update \
 USER container
 WORKDIR /home/container
 
-# The inherited yolk script is readable but may not have its executable bit set.
-ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "/entrypoint.sh"]
+# Wings passes the installer as CMD; forward it instead of running STARTUP.
+# With no command, use the normal yolk startup script via Bash.
+ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "-c", "if [ \"$#\" -gt 0 ]; then exec \"$@\"; else exec /bin/bash /entrypoint.sh; fi", "--"]
+CMD []
 
