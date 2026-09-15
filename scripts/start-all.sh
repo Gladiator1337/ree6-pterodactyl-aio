@@ -12,6 +12,7 @@ MYSQL_PID=""
 BACKEND_PID=""
 BOT_PID=""
 FRONTEND_PID=""
+TICKET_COMPAT_PID=""
 SHUTTING_DOWN=0
 
 log() { printf '[REE6-AIO] %s\n' "$*"; }
@@ -21,7 +22,7 @@ stop_services() {
     SHUTTING_DOWN=1
     log "Stopping services..."
 
-    for pid in "${FRONTEND_PID}" "${BOT_PID}" "${BACKEND_PID}"; do
+    for pid in "${TICKET_COMPAT_PID}" "${FRONTEND_PID}" "${BOT_PID}" "${BACKEND_PID}"; do
         if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
             kill -TERM "${pid}" 2>/dev/null || true
         fi
@@ -82,6 +83,28 @@ GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'127.0.0.1';
 FLUSH PRIVILEGES;
 SQL
 log "MariaDB is ready."
+
+# Webinterface 5.0.4 cannot create the first Tickets entity because its
+# updateTicket() service returns false when no row exists. Keep a zero-value
+# placeholder for every guild known to Settings. Removing a ticket setup still
+# behaves as disabled, while a later setup can update the placeholder again.
+ticket_compat_loop() {
+    while true; do
+        mariadb --protocol=socket --socket="${DB_SOCKET}" -uroot "${DB_NAME}" >/dev/null 2>&1 <<'SQL' || true
+INSERT IGNORE INTO Tickets
+    (guildId, channelId, ticketCategory, logChannelId, logChannelWebhookId, logChannelWebhookToken, ticketCount)
+SELECT DISTINCT
+    CAST(gid AS UNSIGNED), 0, 0, 0, 0, NULL, 0
+FROM Settings
+WHERE gid REGEXP '^[0-9]+$';
+SQL
+        sleep 3
+    done
+}
+
+ticket_compat_loop &
+TICKET_COMPAT_PID=$!
+log "REE6 5.0.4 ticket compatibility guard enabled."
 
 "${ROOT}/scripts/build-frontend.sh"
 
