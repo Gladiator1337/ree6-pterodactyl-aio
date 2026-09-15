@@ -23,7 +23,7 @@ const egg = {
   description: 'REE6 Bot, Webinterface frontend/backend and private MariaDB in one Pterodactyl server. Requires the bundled custom runtime image.',
   features: null,
   docker_images: {
-    'REE6 AIO Runtime 1.0.0': 'ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.0.0'
+    'REE6 AIO Runtime 1.1.0': 'ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.1.0'
   },
   file_denylist: [],
   startup: 'bash /home/container/scripts/start-all.sh',
@@ -69,17 +69,18 @@ const egg = {
   },
   scripts: { installation: {
     script: installer,
-    container: 'ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.0.0',
+    container: 'ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.1.0',
     entrypoint: 'bash'
   }},
   variables: [
-    variable('REE6 Bot Version', 'Pinned GitHub release tag or latest.', 'BOT_VERSION', '4.0.12', 'required|string|max:30'),
+    variable('REE6 Bot Version', 'Patched REE6 version bundled in the selected runtime image.', 'BOT_VERSION', '4.0.12', 'required|in:4.0.12'),
     variable('Webinterface Version', 'Pinned GitHub release tag or latest.', 'WEB_VERSION', '5.0.4', 'required|string|max:30'),
     variable('Discord Bot Token', 'Discord bot token. Admin-only secret.', 'DISCORD_TOKEN', '', 'required|string|max:200', false, false),
     variable('Discord Client ID', 'Discord application/client ID.', 'DISCORD_CLIENT_ID', '', 'required|numeric|digits_between:15,25'),
     variable('Discord Client Secret', 'Discord OAuth client secret. Admin-only secret.', 'DISCORD_CLIENT_SECRET', '', 'required|string|max:200', false, false),
     variable('Bot Owner ID', 'Discord user ID of the bot owner.', 'BOT_OWNER_ID', '', 'required|numeric|digits_between:15,25'),
     variable('Bot Shards', 'Discord shard count.', 'BOT_SHARDS', '1', 'required|integer|min:1|max:100'),
+    variable('Temporary Voice Name', 'Template for temporary voice channels. Placeholders: {displayName}, {username}, {number}; legacy %s is the number.', 'TEMPORAL_VOICE_NAME', '🔊 Talk von {displayName}', 'required|string|min:1|max:100'),
     variable('Frontend URL', 'Public frontend URL without trailing slash.', 'FRONTEND_URL', 'https://cp.example.de', 'required|url|max:200'),
     variable('Backend URL', 'Public backend URL without trailing slash; embedded into the frontend build.', 'BACKEND_URL', 'https://api.example.de', 'required|url|max:200'),
     variable('Invite URL', 'Discord OAuth invite link.', 'INVITE_URL', 'https://discord.com/oauth2/authorize', 'required|url|max:500'),
@@ -102,4 +103,3 @@ const egg = {
 };
 
 fs.writeFileSync(path.join(root, 'egg-ree6-all-in-one.json'), JSON.stringify(egg, null, 2) + '\n');
-

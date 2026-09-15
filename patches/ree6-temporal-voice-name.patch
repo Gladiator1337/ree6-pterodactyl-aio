@@ -1,0 +1,67 @@
+diff --git a/src/main/java/de/presti/ree6/events/OtherEvents.java b/src/main/java/de/presti/ree6/events/OtherEvents.java
+index 23386d0..71f3f3f 100644
+--- a/src/main/java/de/presti/ree6/events/OtherEvents.java
++++ b/src/main/java/de/presti/ree6/events/OtherEvents.java
+@@ -341,23 +341,50 @@ public class OtherEvents extends ListenerAdapter {
+                             return;
+                         }
+ 
+-                        if (voiceChannel.getParentCategory() != null) {
+-                            LanguageService.getByGuild(guild, "label.temporalVoiceName", "SPLIT").subscribe(preName -> {
+-                                preName = preName.split("SPLIT")[0];
+-                                String finalPreName = preName;
+-                                LanguageService.getByGuild(guild, "label.temporalVoiceName",
+-                                                guild.getVoiceChannels().stream().filter(c -> c.getName().startsWith(finalPreName)).count() + 1)
+-                                        .subscribe(name -> voiceChannel.getParentCategory().createVoiceChannel(name)
+-                                                .queue(channel -> {
+-                                                    guild.moveVoiceMember(member, channel).queue();
+-                                                    ArrayUtil.temporalVoicechannel.add(channel.getId());
+-                                                }));
+-                            });
++                        Category parentCategory = voiceChannel.getParentCategory();
++                        if (parentCategory != null) {
++                            long channelNumber = parentCategory.getVoiceChannels().stream()
++                                    .filter(ArrayUtil::isTemporalVoicechannel)
++                                    .count() + 1;
++
++                            String configuredTemplate = System.getenv("TEMPORAL_VOICE_NAME");
++                            Mono<String> template = configuredTemplate == null || configuredTemplate.isBlank()
++                                    ? LanguageService.getByGuild(guild, "label.temporalVoiceName", channelNumber)
++                                    : Mono.just(configuredTemplate);
++
++                            template.map(name -> resolveTemporalVoiceName(name, member, channelNumber))
++                                    .subscribe(name -> parentCategory.createVoiceChannel(name)
++                                            .queue(channel -> {
++                                                guild.moveVoiceMember(member, channel).queue();
++                                                ArrayUtil.temporalVoicechannel.add(channel.getId());
++                                            }));
+                         }
+                     }
+                 });
+     }
+ 
++    private String resolveTemporalVoiceName(String template, Member member, long channelNumber) {
++        String displayName = member.getEffectiveName().replace('\n', ' ').replace('\r', ' ').trim();
++        String username = member.getUser().getName().replace('\n', ' ').replace('\r', ' ').trim();
++
++        String resolvedName = template
++                .replace("{displayName}", displayName)
++                .replace("{username}", username)
++                .replace("{number}", String.valueOf(channelNumber))
++                .replace("%s", String.valueOf(channelNumber))
++                .trim();
++
++        if (resolvedName.isBlank()) {
++            resolvedName = "Temporal VC #" + channelNumber;
++        }
++
++        if (resolvedName.codePointCount(0, resolvedName.length()) > 100) {
++            resolvedName = resolvedName.substring(0, resolvedName.offsetByCodePoints(0, 100));
++        }
++
++        return resolvedName;
++    }
++
+     private boolean checkChannel(AudioChannelUnion channel, JDA instance) {
+         if (ArrayUtil.isTemporalVoicechannel(channel)
+                 && (channel.getMembers().isEmpty() || (channel.getMembers().size() == 1 &&
