@@ -108,17 +108,45 @@ log "REE6 5.0.4 ticket compatibility guard enabled."
 
 "${ROOT}/scripts/build-frontend.sh"
 
+log "Starting REE6 bot..."
+BOT_STARTUP_LOG="${ROOT}/logs/bot-startup.log"
+: > "${BOT_STARTUP_LOG}"
+env config="${ROOT}/bot/config/config.yml" java -Xms128M -Xmx"${BOT_MEMORY_MB:-1536}M" \
+    -Dnogui=true \
+    -jar "${ROOT}/runtime/bot/Ree6.jar" \
+    > >(tee -a "${BOT_STARTUP_LOG}") 2>&1 &
+BOT_PID=$!
+
+log "Waiting for the bot Discord session to finish loading..."
+BOT_READY=0
+for _ in $(seq 1 180); do
+    if grep -Fq "Finished Loading!" "${BOT_STARTUP_LOG}"; then
+        BOT_READY=1
+        break
+    fi
+    if ! kill -0 "${BOT_PID}" 2>/dev/null; then
+        wait "${BOT_PID}" || status=$?
+        log "REE6 bot exited during startup (status ${status:-0})."
+        exit 1
+    fi
+    sleep 1
+done
+
+if [[ "${BOT_READY}" != "1" ]]; then
+    log "REE6 bot did not become ready within 180 seconds. Backend will not be started."
+    exit 1
+fi
+
+# The bot and backend authenticate the same Discord application through two
+# independent JDA sessions. Serializing them avoids an IDENTIFY/reconnect loop.
+log "REE6 bot is ready. Waiting 10 seconds before starting backend JDA..."
+sleep 10
+
 log "Starting backend on port ${BACKEND_PORT:-8888}..."
 env config="${ROOT}/backend/config/config.yml" java -Xms128M -Xmx"${BACKEND_MEMORY_MB:-768}M" \
     -Dserver.port="${BACKEND_PORT:-8888}" \
     -jar "${ROOT}/runtime/backend/Webinterface.jar" &
 BACKEND_PID=$!
-
-log "Starting REE6 bot..."
-env config="${ROOT}/bot/config/config.yml" java -Xms128M -Xmx"${BOT_MEMORY_MB:-1536}M" \
-    -Dnogui=true \
-    -jar "${ROOT}/runtime/bot/Ree6.jar" &
-BOT_PID=$!
 
 log "Starting frontend on port ${SERVER_PORT}..."
 (
