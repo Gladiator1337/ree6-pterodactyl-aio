@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        ca-certificates curl git jq mariadb-client mariadb-server \
+        ca-certificates curl git gosu jq mariadb-client mariadb-server \
         nodejs npm tini fontconfig fonts-dejavu-core fonts-noto-core \
     && npm install --global n \
     && n 22 \
@@ -15,11 +15,11 @@ RUN apt-get update \
     && mkdir -p /home/container \
     && chown -R container:container /home/container
 
-USER container
+USER root
 WORKDIR /home/container
 
-# Wings mounts its installer without an executable bit. Run shell scripts with
-# Bash, forward other commands normally, and use the yolk startup when no
-# command was supplied.
-ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "-c", "if [ \"$#\" -gt 0 ]; then case \"$1\" in *.sh) exec /bin/bash \"$@\" ;; *) exec \"$@\" ;; esac; else exec /bin/bash /entrypoint.sh; fi", "--"]
+# Wings mounts /mnt/install/install.sh as root-only and invokes the configured
+# egg entrypoint as CMD. Run that one command as root. All normal server paths
+# drop back to the unprivileged container user.
+ENTRYPOINT ["/usr/bin/tini", "--", "/bin/bash", "-c", "if [ \"$#\" -ge 2 ] && [ \"$1\" = bash ] && [ \"$2\" = /mnt/install/install.sh ]; then exec /bin/bash /mnt/install/install.sh; elif [ \"$#\" -gt 0 ]; then exec /usr/sbin/gosu container \"$@\"; else exec /usr/sbin/gosu container /bin/bash /entrypoint.sh; fi", "--"]
 CMD []
