@@ -4,7 +4,7 @@ This package runs REE6 Bot, Webinterface Backend, Webinterface Frontend, and a p
 
 ## Components
 
-- REE6 Bot `4.0.12` (Java 21)
+- Patched REE6 Bot `4.0.12` (Java 21)
 - REE6 Webinterface `5.0.4` (Java 21 + Node 22)
 - MariaDB bound to `127.0.0.1:3306`
 - One primary frontend allocation plus one additional backend allocation
@@ -57,6 +57,14 @@ Persistent paths are `database/`, `bot/`, and `backend/`. Reinstall updates runt
 This is a multi-process container by design. If any critical service exits, the startup supervisor stops the server so Pterodactyl can detect and restart the crash.
 
 The supervisor starts the REE6 bot first and waits for JDA's `Finished Loading!` marker before it starts the webinterface backend. A further ten-second gap serializes the two Discord `IDENTIFY` operations. This prevents the bot and backend, which use independent JDA sessions for the same Discord application, from entering a mutual reconnect loop during startup.
+
+## Temporary voice-channel names
+
+The bundled bot adds configurable MEE6-style names for temporary voice channels. Set `TEMPORAL_VOICE_NAME` in the Pterodactyl startup variables. The default is:
+
+`🔊 Talk von {displayName}`
+
+Supported placeholders are `{displayName}`, `{username}`, and `{number}`. Existing `%s` templates remain compatible and use the channel number. Discord names are normalized to one line and limited safely to 100 Unicode characters.
 
 The backend is deliberately given its config path through the lowercase `config` environment variable. Webinterface 5.0.4 has a command-line parser defect for `--config=...`; using that form can silently select the wrong file and fall back to SQLite.
 
