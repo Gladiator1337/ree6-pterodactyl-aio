@@ -1,0 +1,282 @@
+{
+  "_comment": "DO NOT EDIT: FILE GENERATED FOR PTERODACTYL PANEL",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-09-15T02:03:35.203Z",
+  "name": "REE6 All-in-One",
+  "author": "admin@megaservers.de",
+  "description": "REE6 Bot, Webinterface frontend/backend and private MariaDB in one Pterodactyl server. Requires the bundled custom runtime image.",
+  "features": null,
+  "docker_images": {
+    "REE6 AIO Runtime 1.0.0": "ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.0.0"
+  },
+  "file_denylist": [],
+  "startup": "bash /home/container/scripts/start-all.sh",
+  "config": {
+    "files": "{\"bot/config/config.yml\":{\"parser\":\"yaml\",\"find\":{\"hikari.sql.user\":\"{{server.build.env.DATABASE_USER}}\",\"hikari.sql.db\":\"{{server.build.env.DATABASE_NAME}}\",\"hikari.sql.pw\":\"{{server.build.env.DATABASE_PASSWORD}}\",\"hikari.sql.host\":\"127.0.0.1\",\"hikari.sql.port\":\"3306\",\"hikari.misc.storage\":\"mariadb\",\"hikari.misc.poolSize\":\"{{server.build.env.DATABASE_POOL}}\",\"bot.tokens.release\":\"{{server.build.env.DISCORD_TOKEN}}\",\"bot.misc.ownerId\":\"{{server.build.env.BOT_OWNER_ID}}\",\"bot.misc.shards\":\"{{server.build.env.BOT_SHARDS}}\",\"bot.misc.invite\":\"{{server.build.env.INVITE_URL}}\",\"bot.misc.webinterface\":\"{{server.build.env.FRONTEND_URL}}\",\"bot.misc.debug\":\"{{server.build.env.DEBUG}}\"}},\"backend/config/config.yml\":{\"parser\":\"yaml\",\"find\":{\"hikari.sql.user\":\"{{server.build.env.DATABASE_USER}}\",\"hikari.sql.db\":\"{{server.build.env.DATABASE_NAME}}\",\"hikari.sql.pw\":\"{{server.build.env.DATABASE_PASSWORD}}\",\"hikari.sql.host\":\"127.0.0.1\",\"hikari.sql.port\":\"3306\",\"hikari.misc.storage\":\"mariadb\",\"hikari.misc.poolSize\":\"{{server.build.env.DATABASE_POOL}}\",\"discord.bot.tokens.release\":\"{{server.build.env.DISCORD_TOKEN}}\",\"discord.client.id\":\"{{server.build.env.DISCORD_CLIENT_ID}}\",\"discord.client.secret\":\"{{server.build.env.DISCORD_CLIENT_SECRET}}\",\"discord.client.shards\":\"{{server.build.env.BOT_SHARDS}}\",\"webinterface.discordRedirect\":\"{{server.build.env.DISCORD_REDIRECT_URL}}\",\"webinterface.twitchRedirect\":\"{{server.build.env.TWITCH_REDIRECT_URL}}\",\"webinterface.errorRedirect\":\"{{server.build.env.ERROR_REDIRECT_URL}}\",\"webinterface.loginRedirect\":\"{{server.build.env.LOGIN_REDIRECT_URL}}\",\"webinterface.allowedDomains\":\"{{server.build.env.ALLOWED_DOMAINS}}\"}}}",
+    "startup": "{\"done\":\"[REE6-AIO] All services started\"}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/usr/bin/env bash\nset -Eeuo pipefail\n\nexport HOME=/mnt/server\nROOT=/mnt/server\n\nlog() { printf '[REE6-AIO installer] %s\\n' \"$*\"; }\n\nrelease_json() {\n    local repo=\"$1\" version=\"$2\"\n    if [[ -z \"${version}\" || \"${version}\" == \"latest\" ]]; then\n        curl -fsSL \"https://api.github.com/repos/${repo}/releases/latest\"\n    else\n        curl -fsSL \"https://api.github.com/repos/${repo}/releases/tags/${version}\"\n    fi\n}\n\nmkdir -p \\\n    \"${ROOT}/runtime/bot\" \"${ROOT}/runtime/backend\" \\\n    \"${ROOT}/bot/config\" \"${ROOT}/bot/storage\" \"${ROOT}/bot/languages\" \\\n    \"${ROOT}/backend/config\" \"${ROOT}/backend/storage\" \\\n    \"${ROOT}/database/mysql\" \"${ROOT}/database/run\" \"${ROOT}/database/tmp\" \\\n    \"${ROOT}/scripts\" \"${ROOT}/logs\" \"${ROOT}/.ree6-aio\"\n\nBOT_JSON=\"$(release_json Ree6-Applications/Ree6 \"${BOT_VERSION:-4.0.12}\")\"\nBOT_URL=\"$(jq -r '.assets[] | select(.name | test(\"jar-with-dependencies\\\\.jar$\")) | .browser_download_url' <<<\"${BOT_JSON}\" | head -n1)\"\n[[ -n \"${BOT_URL}\" && \"${BOT_URL}\" != \"null\" ]] || { log \"Unable to find the REE6 fat JAR.\"; exit 1; }\n\nWEB_JSON=\"$(release_json Ree6-Applications/Webinterface \"${WEB_VERSION:-5.0.4}\")\"\nBACKEND_URL_ASSET=\"$(jq -r '.assets[] | select(.name | test(\"Webinterface-Backend-.*\\\\.jar$\")) | .browser_download_url' <<<\"${WEB_JSON}\" | head -n1)\"\nFRONTEND_TARBALL=\"$(jq -r '.tarball_url' <<<\"${WEB_JSON}\")\"\n[[ -n \"${BACKEND_URL_ASSET}\" && \"${BACKEND_URL_ASSET}\" != \"null\" ]] || { log \"Unable to find the backend JAR.\"; exit 1; }\n\nif [[ -f \"${ROOT}/runtime/bot/Ree6.jar\" ]]; then cp -f \"${ROOT}/runtime/bot/Ree6.jar\" \"${ROOT}/runtime/bot/Ree6.jar.previous\"; fi\nif [[ -f \"${ROOT}/runtime/backend/Webinterface.jar\" ]]; then cp -f \"${ROOT}/runtime/backend/Webinterface.jar\" \"${ROOT}/runtime/backend/Webinterface.jar.previous\"; fi\n\nlog \"Downloading REE6 bot...\"\ncurl -fL --retry 3 -o \"${ROOT}/runtime/bot/Ree6.jar.new\" \"${BOT_URL}\"\nmv -f \"${ROOT}/runtime/bot/Ree6.jar.new\" \"${ROOT}/runtime/bot/Ree6.jar\"\n\nlog \"Downloading webinterface backend...\"\ncurl -fL --retry 3 -o \"${ROOT}/runtime/backend/Webinterface.jar.new\" \"${BACKEND_URL_ASSET}\"\nmv -f \"${ROOT}/runtime/backend/Webinterface.jar.new\" \"${ROOT}/runtime/backend/Webinterface.jar\"\n\nlog \"Downloading webinterface frontend source...\"\ntmp_dir=\"$(mktemp -d)\"\ntrap 'rm -rf \"${tmp_dir}\"' EXIT\ncurl -fL --retry 3 -o \"${tmp_dir}/webinterface.tar.gz\" \"${FRONTEND_TARBALL}\"\nmkdir -p \"${tmp_dir}/source\"\ntar -xzf \"${tmp_dir}/webinterface.tar.gz\" -C \"${tmp_dir}/source\" --strip-components=1\n[[ -f \"${tmp_dir}/source/Frontend/package.json\" ]] || { log \"Frontend source is missing.\"; exit 1; }\nif [[ -d \"${ROOT}/runtime/frontend\" ]]; then\n    rm -rf \"${ROOT}/runtime/frontend.previous\"\n    mv \"${ROOT}/runtime/frontend\" \"${ROOT}/runtime/frontend.previous\"\nfi\nmv \"${tmp_dir}/source/Frontend\" \"${ROOT}/runtime/frontend\"\n\ncd \"${ROOT}/runtime/frontend\"\nprintf 'VITE_API_URL=%s\\nVITE_INVITE_URL=%s\\n' \"${BACKEND_URL}\" \"${INVITE_URL}\" > .env\nif [[ -f package-lock.json ]]; then npm ci; else npm install; fi\nnpm install --save-dev @sveltejs/adapter-node --force\nsed -i 's|@sveltejs/adapter-auto|@sveltejs/adapter-node|g' svelte.config.js\nnpm run build\ntest -f build/index.js\nprintf '%s\\n' \"$(printf '%s\\n%s\\n%s\\n' \"${WEB_VERSION:-5.0.4}\" \"${BACKEND_URL}\" \"${INVITE_URL}\" | sha256sum | awk '{print $1}')\" > \"${ROOT}/.ree6-aio/frontend-build.sha256\"\n\nif [[ ! -f \"${ROOT}/bot/config/config.yml\" ]]; then\n    log \"Generating bot configuration...\"\n    cd \"${ROOT}/runtime/bot\"\n    timeout 15s env config=\"${ROOT}/bot/config/config.yml\" java -jar Ree6.jar >/dev/null 2>&1 || true\nfi\n\nif [[ ! -f \"${ROOT}/backend/config/config.yml\" ]]; then\n    log \"Generating backend configuration...\"\n    cd \"${ROOT}/runtime/backend\"\n    timeout 15s env config=\"${ROOT}/backend/config/config.yml\" java -Dserver.port=0 -jar Webinterface.jar >/dev/null 2>&1 || true\nfi\n\n[[ -s \"${ROOT}/bot/config/config.yml\" ]] || { log \"Bot config generation failed.\"; exit 1; }\n[[ -s \"${ROOT}/backend/config/config.yml\" ]] || { log \"Backend config generation failed.\"; exit 1; }\n\nprintf '%s' 'IyEvdXNyL2Jpbi9lbnYgYmFzaApzZXQgLUVldW8gcGlwZWZhaWwKCnJlYWRvbmx5IFJPT1Q9Ii9ob21lL2NvbnRhaW5lciIKcmVhZG9ubHkgREJfRElSPSIke1JPT1R9L2RhdGFiYXNlL215c3FsIgpyZWFkb25seSBEQl9SVU49IiR7Uk9PVH0vZGF0YWJhc2UvcnVuIgpyZWFkb25seSBEQl9UTVA9IiR7Uk9PVH0vZGF0YWJhc2UvdG1wIgpyZWFkb25seSBEQl9TT0NLRVQ9IiR7REJfUlVOfS9teXNxbGQuc29jayIKcmVhZG9ubHkgREJfUElEX0ZJTEU9IiR7REJfUlVOfS9teXNxbGQucGlkIgoKTVlTUUxfUElEPSIiCkJBQ0tFTkRfUElEPSIiCkJPVF9QSUQ9IiIKRlJPTlRFTkRfUElEPSIiClNIVVRUSU5HX0RPV049MAoKbG9nKCkgeyBwcmludGYgJ1tSRUU2LUFJT10gJXNcbicgIiQqIjsgfQoKc3RvcF9zZXJ2aWNlcygpIHsKICAgIGlmIFtbICIke1NIVVRUSU5HX0RPV059IiA9PSAiMSIgXV07IHRoZW4gcmV0dXJuOyBmaQogICAgU0hVVFRJTkdfRE9XTj0xCiAgICBsb2cgIlN0b3BwaW5nIHNlcnZpY2VzLi4uIgoKICAgIGZvciBwaWQgaW4gIiR7RlJPTlRFTkRfUElEfSIgIiR7Qk9UX1BJRH0iICIke0JBQ0tFTkRfUElEfSI7IGRvCiAgICAgICAgaWYgW1sgLW4gIiR7cGlkfSIgXV0gJiYga2lsbCAtMCAiJHtwaWR9IiAyPi9kZXYvbnVsbDsgdGhlbgogICAgICAgICAgICBraWxsIC1URVJNICIke3BpZH0iIDI+L2Rldi9udWxsIHx8IHRydWUKICAgICAgICBmaQogICAgZG9uZQoKICAgIGlmIFtbIC1TICIke0RCX1NPQ0tFVH0iIF1dOyB0aGVuCiAgICAgICAgbWFyaWFkYi1hZG1pbiAtLXByb3RvY29sPXNvY2tldCAtLXNvY2tldD0iJHtEQl9TT0NLRVR9IiAtdXJvb3Qgc2h1dGRvd24gPi9kZXYvbnVsbCAyPiYxIHx8IHRydWUKICAgIGZpCiAgICB3YWl0IHx8IHRydWUKfQoKdHJhcCBzdG9wX3NlcnZpY2VzIFNJR0lOVCBTSUdURVJNIEVYSVQKCm1rZGlyIC1wICIke0RCX0RJUn0iICIke0RCX1JVTn0iICIke0RCX1RNUH0iICIke1JPT1R9L2xvZ3MiCgppZiBbWyAhIC1kICIke0RCX0RJUn0vbXlzcWwiIF1dOyB0aGVuCiAgICBsb2cgIkluaXRpYWxpemluZyBNYXJpYURCIGRhdGEgZGlyZWN0b3J5Li4uIgogICAgbWFyaWFkYi1pbnN0YWxsLWRiIFwKICAgICAgICAtLWRhdGFkaXI9IiR7REJfRElSfSIgXAogICAgICAgIC0tYXV0aC1yb290LWF1dGhlbnRpY2F0aW9uLW1ldGhvZD1ub3JtYWwgXAogICAgICAgIC0tc2tpcC10ZXN0LWRiID4vZGV2L251bGwKZmkKCmxvZyAiU3RhcnRpbmcgTWFyaWFEQiBvbiAxMjcuMC4wLjE6MzMwNi4uLiIKbWFyaWFkYmQgLS1uby1kZWZhdWx0cyBcCiAgICAtLWRhdGFkaXI9IiR7REJfRElSfSIgXAogICAgLS1zb2NrZXQ9IiR7REJfU09DS0VUfSIgXAogICAgLS1waWQtZmlsZT0iJHtEQl9QSURfRklMRX0iIFwKICAgIC0tdG1wZGlyPSIke0RCX1RNUH0iIFwKICAgIC0tYmluZC1hZGRyZXNzPTEyNy4wLjAuMSBcCiAgICAtLXBvcnQ9MzMwNiBcCiAgICAtLXNraXAtbmFtZS1yZXNvbHZlIFwKICAgIC0tbWF4LWNvbm5lY3Rpb25zPTEwMCBcCiAgICAtLWlubm9kYi1idWZmZXItcG9vbC1zaXplPSIke01BUklBREJfQlVGRkVSX1BPT0xfTUI6LTI1Nn1NIiBcCiAgICAtLWNvbnNvbGUgJgpNWVNRTF9QSUQ9JCEKCmZvciBfIGluIHsxLi42MH07IGRvCiAgICBpZiBtYXJpYWRiLWFkbWluIC0tcHJvdG9jb2w9c29ja2V0IC0tc29ja2V0PSIke0RCX1NPQ0tFVH0iIC11cm9vdCBwaW5nID4vZGV2L251bGwgMj4mMTsgdGhlbiBicmVhazsgZmkKICAgIGlmICEga2lsbCAtMCAiJHtNWVNRTF9QSUR9IiAyPi9kZXYvbnVsbDsgdGhlbiBsb2cgIk1hcmlhREIgZXhpdGVkIGR1cmluZyBzdGFydHVwLiI7IGV4aXQgMTsgZmkKICAgIHNsZWVwIDEKZG9uZQptYXJpYWRiLWFkbWluIC0tcHJvdG9jb2w9c29ja2V0IC0tc29ja2V0PSIke0RCX1NPQ0tFVH0iIC11cm9vdCBwaW5nID4vZGV2L251bGwgMj4mMSB8fCB7IGxvZyAiTWFyaWFEQiBkaWQgbm90IGJlY29tZSByZWFkeS4iOyBleGl0IDE7IH0KCkRCX05BTUU9IiR7REFUQUJBU0VfTkFNRTotcmVlNn0iCkRCX1VTRVI9IiR7REFUQUJBU0VfVVNFUjotcmVlNn0iCkRCX1BBU1M9IiR7REFUQUJBU0VfUEFTU1dPUkQ6P0RBVEFCQVNFX1BBU1NXT1JEIGlzIHJlcXVpcmVkfSIKCltbICIke0RCX05BTUV9IiA9fiBeW0EtWmEtejAtOV9dKyQgXV0gfHwgeyBsb2cgIkludmFsaWQgREFUQUJBU0VfTkFNRS4iOyBleGl0IDE7IH0KW1sgIiR7REJfVVNFUn0iID1+IF5bQS1aYS16MC05X10rJCBdXSB8fCB7IGxvZyAiSW52YWxpZCBEQVRBQkFTRV9VU0VSLiI7IGV4aXQgMTsgfQpbWyAiJHtEQl9QQVNTfSIgPX4gXltBLVphLXowLTlfLkAlKz06LV17MTIsNjR9JCBdXSB8fCB7IGxvZyAiREFUQUJBU0VfUEFTU1dPUkQgbXVzdCBiZSAxMi02NCBzYWZlIGNoYXJhY3RlcnMuIjsgZXhpdCAxOyB9CgptYXJpYWRiIC0tcHJvdG9jb2w9c29ja2V0IC0tc29ja2V0PSIke0RCX1NPQ0tFVH0iIC11cm9vdCA8PFNRTApDUkVBVEUgREFUQUJBU0UgSUYgTk9UIEVYSVNUUyBcYCR7REJfTkFNRX1cYCBDSEFSQUNURVIgU0VUIHV0ZjhtYjQgQ09MTEFURSB1dGY4bWI0X3VuaWNvZGVfY2k7CkNSRUFURSBVU0VSIElGIE5PVCBFWElTVFMgJyR7REJfVVNFUn0nQCcxMjcuMC4wLjEnIElERU5USUZJRUQgQlkgJyR7REJfUEFTU30nOwpBTFRFUiBVU0VSICcke0RCX1VTRVJ9J0AnMTI3LjAuMC4xJyBJREVOVElGSUVEIEJZICcke0RCX1BBU1N9JzsKR1JBTlQgQUxMIFBSSVZJTEVHRVMgT04gXGAke0RCX05BTUV9XGAuKiBUTyAnJHtEQl9VU0VSfSdAJzEyNy4wLjAuMSc7CkZMVVNIIFBSSVZJTEVHRVM7ClNRTApsb2cgIk1hcmlhREIgaXMgcmVhZHkuIgoKIiR7Uk9PVH0vc2NyaXB0cy9idWlsZC1mcm9udGVuZC5zaCIKCmxvZyAiU3RhcnRpbmcgYmFja2VuZCBvbiBwb3J0ICR7QkFDS0VORF9QT1JUOi04ODg4fS4uLiIKZW52IGNvbmZpZz0iJHtST09UfS9iYWNrZW5kL2NvbmZpZy9jb25maWcueW1sIiBqYXZhIC1YbXMxMjhNIC1YbXgiJHtCQUNLRU5EX01FTU9SWV9NQjotNzY4fU0iIFwKICAgIC1Ec2VydmVyLnBvcnQ9IiR7QkFDS0VORF9QT1JUOi04ODg4fSIgXAogICAgLWphciAiJHtST09UfS9ydW50aW1lL2JhY2tlbmQvV2ViaW50ZXJmYWNlLmphciIgJgpCQUNLRU5EX1BJRD0kIQoKbG9nICJTdGFydGluZyBSRUU2IGJvdC4uLiIKZW52IGNvbmZpZz0iJHtST09UfS9ib3QvY29uZmlnL2NvbmZpZy55bWwiIGphdmEgLVhtczEyOE0gLVhteCIke0JPVF9NRU1PUllfTUI6LTE1MzZ9TSIgXAogICAgLURub2d1aT10cnVlIFwKICAgIC1qYXIgIiR7Uk9PVH0vcnVudGltZS9ib3QvUmVlNi5qYXIiICYKQk9UX1BJRD0kIQoKbG9nICJTdGFydGluZyBmcm9udGVuZCBvbiBwb3J0ICR7U0VSVkVSX1BPUlR9Li4uIgooCiAgICBjZCAiJHtST09UfS9ydW50aW1lL2Zyb250ZW5kIgogICAgZXhlYyBlbnYgSE9TVD0wLjAuMC4wIFBPUlQ9IiR7U0VSVkVSX1BPUlR9IiBOT0RFX0VOVj1wcm9kdWN0aW9uIG5vZGUgYnVpbGQvaW5kZXguanMKKSAmCkZST05URU5EX1BJRD0kIQoKbG9nICJBbGwgc2VydmljZXMgc3RhcnRlZCAoZnJvbnRlbmQ6JHtTRVJWRVJfUE9SVH0sIGJhY2tlbmQ6JHtCQUNLRU5EX1BPUlQ6LTg4ODh9LCBNYXJpYURCOmxvY2FsaG9zdCBvbmx5KS4iCgp3aGlsZSB0cnVlOyBkbwogICAgZm9yIHBhaXIgaW4gIk1hcmlhREI6JHtNWVNRTF9QSUR9IiAiQmFja2VuZDoke0JBQ0tFTkRfUElEfSIgIkJvdDoke0JPVF9QSUR9IiAiRnJvbnRlbmQ6JHtGUk9OVEVORF9QSUR9IjsgZG8KICAgICAgICBuYW1lPSIke3BhaXIlJToqfSI7IHBpZD0iJHtwYWlyIyo6fSIKICAgICAgICBpZiAhIGtpbGwgLTAgIiR7cGlkfSIgMj4vZGV2L251bGw7IHRoZW4KICAgICAgICAgICAgd2FpdCAiJHtwaWR9IiB8fCBzdGF0dXM9JD8KICAgICAgICAgICAgbG9nICJDcml0aWNhbCBzZXJ2aWNlICR7bmFtZX0gZXhpdGVkIChzdGF0dXMgJHtzdGF0dXM6LTB9KS4iCiAgICAgICAgICAgIGV4aXQgMQogICAgICAgIGZpCiAgICBkb25lCiAgICBzbGVlcCAyCmRvbmUK' | base64 -d > \"${ROOT}/scripts/start-all.sh\"\nprintf '%s' 'IyEvdXNyL2Jpbi9lbnYgYmFzaApzZXQgLUVldW8gcGlwZWZhaWwKClJPT1Q9Ii9ob21lL2NvbnRhaW5lciIKRlJPTlRFTkQ9IiR7Uk9PVH0vcnVudGltZS9mcm9udGVuZCIKU1RBVEU9IiR7Uk9PVH0vLnJlZTYtYWlvL2Zyb250ZW5kLWJ1aWxkLnNoYTI1NiIKCm1rZGlyIC1wICIkKGRpcm5hbWUgIiR7U1RBVEV9IikiCmRlc2lyZWQ9IiQocHJpbnRmICclc1xuJXNcbiVzXG4nICIke1dFQl9WRVJTSU9OOi01LjAuNH0iICIke0JBQ0tFTkRfVVJMfSIgIiR7SU5WSVRFX1VSTH0iIHwgc2hhMjU2c3VtIHwgYXdrICd7cHJpbnQgJDF9JykiCmN1cnJlbnQ9IiQoY2F0ICIke1NUQVRFfSIgMj4vZGV2L251bGwgfHwgdHJ1ZSkiCgppZiBbWyAtZiAiJHtGUk9OVEVORH0vYnVpbGQvaW5kZXguanMiICYmICIke2Rlc2lyZWR9IiA9PSAiJHtjdXJyZW50fSIgXV07IHRoZW4KICAgIHByaW50ZiAnW1JFRTYtQUlPXSBGcm9udGVuZCBidWlsZCBpcyBjdXJyZW50LlxuJwogICAgZXhpdCAwCmZpCgpwcmludGYgJ1tSRUU2LUFJT10gQnVpbGRpbmcgZnJvbnRlbmQuLi5cbicKY2QgIiR7RlJPTlRFTkR9IgpwcmludGYgJ1ZJVEVfQVBJX1VSTD0lc1xuVklURV9JTlZJVEVfVVJMPSVzXG4nICIke0JBQ0tFTkRfVVJMfSIgIiR7SU5WSVRFX1VSTH0iID4gLmVudgoKaWYgW1sgLWYgcGFja2FnZS1sb2NrLmpzb24gXV07IHRoZW4gbnBtIGNpOyBlbHNlIG5wbSBpbnN0YWxsOyBmaQpucG0gaW5zdGFsbCAtLXNhdmUtZGV2IEBzdmVsdGVqcy9hZGFwdGVyLW5vZGUgLS1mb3JjZQpzZWQgLWkgJ3N8QHN2ZWx0ZWpzL2FkYXB0ZXItYXV0b3xAc3ZlbHRlanMvYWRhcHRlci1ub2RlfGcnIHN2ZWx0ZS5jb25maWcuanMKCm5wbSBydW4gYnVpbGQKdGVzdCAtZiBidWlsZC9pbmRleC5qcwpwcmludGYgJyVzXG4nICIke2Rlc2lyZWR9IiA+ICIke1NUQVRFfSIKcHJpbnRmICdbUkVFNi1BSU9dIEZyb250ZW5kIGJ1aWxkIGNvbXBsZXRlZC5cbicK' | base64 -d > \"${ROOT}/scripts/build-frontend.sh\"\n\nchmod +x \"${ROOT}/scripts/start-all.sh\" \"${ROOT}/scripts/build-frontend.sh\"\nprintf '%s\\n' \"bot=${BOT_VERSION:-4.0.12}\" \"web=${WEB_VERSION:-5.0.4}\" > \"${ROOT}/.ree6-aio/versions\"\nlog \"Installation completed.\"\n",
+      "container": "ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.0.0",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "REE6 Bot Version",
+      "description": "Pinned GitHub release tag or latest.",
+      "env_variable": "BOT_VERSION",
+      "default_value": "4.0.12",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:30",
+      "field_type": "text"
+    },
+    {
+      "name": "Webinterface Version",
+      "description": "Pinned GitHub release tag or latest.",
+      "env_variable": "WEB_VERSION",
+      "default_value": "5.0.4",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:30",
+      "field_type": "text"
+    },
+    {
+      "name": "Discord Bot Token",
+      "description": "Discord bot token. Admin-only secret.",
+      "env_variable": "DISCORD_TOKEN",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string|max:200",
+      "field_type": "text"
+    },
+    {
+      "name": "Discord Client ID",
+      "description": "Discord application/client ID.",
+      "env_variable": "DISCORD_CLIENT_ID",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|digits_between:15,25",
+      "field_type": "text"
+    },
+    {
+      "name": "Discord Client Secret",
+      "description": "Discord OAuth client secret. Admin-only secret.",
+      "env_variable": "DISCORD_CLIENT_SECRET",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|string|max:200",
+      "field_type": "text"
+    },
+    {
+      "name": "Bot Owner ID",
+      "description": "Discord user ID of the bot owner.",
+      "env_variable": "BOT_OWNER_ID",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|numeric|digits_between:15,25",
+      "field_type": "text"
+    },
+    {
+      "name": "Bot Shards",
+      "description": "Discord shard count.",
+      "env_variable": "BOT_SHARDS",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:1|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Frontend URL",
+      "description": "Public frontend URL without trailing slash.",
+      "env_variable": "FRONTEND_URL",
+      "default_value": "https://cp.example.de",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|url|max:200",
+      "field_type": "text"
+    },
+    {
+      "name": "Backend URL",
+      "description": "Public backend URL without trailing slash; embedded into the frontend build.",
+      "env_variable": "BACKEND_URL",
+      "default_value": "https://api.example.de",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|url|max:200",
+      "field_type": "text"
+    },
+    {
+      "name": "Invite URL",
+      "description": "Discord OAuth invite link.",
+      "env_variable": "INVITE_URL",
+      "default_value": "https://discord.com/oauth2/authorize",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|url|max:500",
+      "field_type": "text"
+    },
+    {
+      "name": "Discord Redirect URL",
+      "description": "Discord OAuth redirect URL configured in Discord.",
+      "env_variable": "DISCORD_REDIRECT_URL",
+      "default_value": "https://cp.example.de/login",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|url|max:250",
+      "field_type": "text"
+    },
+    {
+      "name": "Login Redirect URL",
+      "description": "Frontend login redirect.",
+      "env_variable": "LOGIN_REDIRECT_URL",
+      "default_value": "https://cp.example.de/login",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|url|max:250",
+      "field_type": "text"
+    },
+    {
+      "name": "Error Redirect URL",
+      "description": "Frontend error redirect.",
+      "env_variable": "ERROR_REDIRECT_URL",
+      "default_value": "https://cp.example.de/error",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|url|max:250",
+      "field_type": "text"
+    },
+    {
+      "name": "Twitch Redirect URL",
+      "description": "Twitch redirect; retain a valid URL even when Twitch is unused.",
+      "env_variable": "TWITCH_REDIRECT_URL",
+      "default_value": "https://cp.example.de/twitch",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|url|max:250",
+      "field_type": "text"
+    },
+    {
+      "name": "Allowed Domains",
+      "description": "Backend CORS allowlist in REE6 syntax.",
+      "env_variable": "ALLOWED_DOMAINS",
+      "default_value": "https://cp.example.de",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:500",
+      "field_type": "text"
+    },
+    {
+      "name": "Backend Port",
+      "description": "Must equal a secondary allocation assigned to this server.",
+      "env_variable": "BACKEND_PORT",
+      "default_value": "8888",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:1024|max:65535",
+      "field_type": "text"
+    },
+    {
+      "name": "Database Name",
+      "description": "Internal MariaDB database.",
+      "env_variable": "DATABASE_NAME",
+      "default_value": "ree6",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|regex:/^[A-Za-z0-9_]+$/|max:32",
+      "field_type": "text"
+    },
+    {
+      "name": "Database User",
+      "description": "Internal MariaDB user.",
+      "env_variable": "DATABASE_USER",
+      "default_value": "ree6",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|regex:/^[A-Za-z0-9_]+$/|max:32",
+      "field_type": "text"
+    },
+    {
+      "name": "Database Password",
+      "description": "12-64 characters: letters, digits, _.@%+=:-. Admin-only secret.",
+      "env_variable": "DATABASE_PASSWORD",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|regex:/^[A-Za-z0-9_.@%+=:-]{12,64}$/",
+      "field_type": "text"
+    },
+    {
+      "name": "Database Pool",
+      "description": "Hikari connection pool size.",
+      "env_variable": "DATABASE_POOL",
+      "default_value": "10",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:2|max:30",
+      "field_type": "text"
+    },
+    {
+      "name": "MariaDB Buffer Pool MB",
+      "description": "MariaDB InnoDB buffer pool memory.",
+      "env_variable": "MARIADB_BUFFER_POOL_MB",
+      "default_value": "256",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:128|max:1024",
+      "field_type": "text"
+    },
+    {
+      "name": "Bot Memory MB",
+      "description": "Java heap limit for the bot.",
+      "env_variable": "BOT_MEMORY_MB",
+      "default_value": "1536",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:512|max:8192",
+      "field_type": "text"
+    },
+    {
+      "name": "Backend Memory MB",
+      "description": "Java heap limit for the backend.",
+      "env_variable": "BACKEND_MEMORY_MB",
+      "default_value": "768",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|min:384|max:4096",
+      "field_type": "text"
+    },
+    {
+      "name": "Debug",
+      "description": "Enable REE6 bot debug logging.",
+      "env_variable": "DEBUG",
+      "default_value": "false",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:true,false",
+      "field_type": "text"
+    },
+    {
+      "name": "Timezone",
+      "description": "Container timezone.",
+      "env_variable": "TZ",
+      "default_value": "Europe/Berlin",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:64",
+      "field_type": "text"
+    }
+  ]
+}
