@@ -23,7 +23,7 @@ const egg = {
   description: 'REE6 Bot, Webinterface frontend/backend and private MariaDB in one Pterodactyl server. Requires the bundled custom runtime image.',
   features: null,
   docker_images: {
-    'REE6 AIO Runtime 1.1.0': 'ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.1.0'
+    'REE6 AIO Runtime 1.1.1': 'ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.1.1'
   },
   file_denylist: [],
   startup: 'bash /home/container/scripts/start-all.sh',
@@ -69,7 +69,7 @@ const egg = {
   },
   scripts: { installation: {
     script: installer,
-    container: 'ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.1.0',
+    container: 'ghcr.io/gladiator1337/ree6-pterodactyl-aio:1.1.1',
     entrypoint: 'bash'
   }},
   variables: [
