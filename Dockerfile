@@ -9,9 +9,11 @@ RUN yum install -y git \
         https://github.com/Ree6-Applications/Ree6.git /build/ree6
 
 COPY patches/ree6-temporal-voice-name.patch /tmp/ree6-temporal-voice-name.patch
+COPY patches/ree6-rss-reader-reuse.patch /tmp/ree6-rss-reader-reuse.patch
 
 RUN cd /build/ree6 \
     && git apply /tmp/ree6-temporal-voice-name.patch \
+    && git apply /tmp/ree6-rss-reader-reuse.patch \
     && mvn -B -DskipTests package \
     && mkdir -p /opt/ree6-aio \
     && cp target/*-jar-with-dependencies.jar /opt/ree6-aio/Ree6.jar \
