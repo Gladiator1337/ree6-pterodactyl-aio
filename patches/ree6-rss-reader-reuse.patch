@@ -1,0 +1,46 @@
+diff --git a/src/main/java/de/presti/ree6/module/notifications/impl/RSSSonic.java b/src/main/java/de/presti/ree6/module/notifications/impl/RSSSonic.java
+index cb6ec5f..e20c744 100644
+--- a/src/main/java/de/presti/ree6/module/notifications/impl/RSSSonic.java
++++ b/src/main/java/de/presti/ree6/module/notifications/impl/RSSSonic.java
+@@ -30,6 +30,7 @@ import java.util.List;
+ public class RSSSonic implements ISonic {
+ 
+     ArrayList<SonicIdentifier> rssUrls = new ArrayList<>();
++    private ItunesRssReader rssReader;
+ 
+     @Override
+     public void load() {
+@@ -52,6 +53,9 @@ public class RSSSonic implements ISonic {
+     public void run() {
+         Collection<String> urls = getList().stream().map(SonicIdentifier::getIdentifier).toList();
+ 
++        // Do not create an HTTP client if no RSS feeds are configured.
++        if (urls.isEmpty()) return;
++
+         /*
+          *  Either switch to RSSHub, YouTubes RSS or stay on API based.
+          *  Issue with RSSHub is that it takes 2 hours to update, because of caching.
+@@ -69,7 +73,9 @@ public class RSSSonic implements ISonic {
+         List<String> checkedIds = new ArrayList<>();
+ 
+         // To support Podcast RSS.
+-        new ItunesRssReader()
++        if (rssReader == null) {
++            rssReader = new ItunesRssReader();
++            rssReader
+                 .addItemExtension("media:description", Item::setDescription)
+                 .addItemExtension("media:thumbnail", "url", (item, element) -> {
+                     Image image = item.getChannel().getImage().orElse(new Image());
+@@ -87,8 +93,10 @@ public class RSSSonic implements ISonic {
+                 .addItemExtension("dc:creator", Item::setAuthor)
+                 .addItemExtension("dc:date", Item::setPubDate)
+                 .addItemExtension("yt:channelId", Item::setAuthor)
+-                .setUserAgent("Ree6Bot/" + BotWorker.getBuild() + " (by Presti)")
+-                .read(urls)
++                .setUserAgent("Ree6Bot/" + BotWorker.getBuild() + " (by Presti)");
++        }
++
++        rssReader.read(urls)
+                 .sorted()
+                 .forEach(item -> {
+                     if (item.getPubDate().isEmpty()) return;
